@@ -1,0 +1,16 @@
+#!/bin/bash
+size="$1"
+if [[ -z "$size" ]]; then
+    echo "Please specify a size."
+else
+    rm -rf "$size"
+    mkdir -p "$size"
+    find . -maxdepth 1 -type f -name "*.svg" -print0 | while IFS= read -r -d '' file; do
+        if [[ ! -h "$file" ]]; then
+            rsvg-convert "$file" -w "$size" -h "$size" -f svg -o "$size/$file"
+            sed -i "s/${size}pt/${size}px/g" "$size/$file"
+        else
+            cp -rdf "$file" "$size/"
+        fi
+    done
+fi
