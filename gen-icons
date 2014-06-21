@@ -105,7 +105,7 @@ cat "$1" | tr "\n" " " | sed -e "s/<\/\?svg[^>]*>//g" -e "s/<[?]\?xml[^>]*>//g"
 }
 
 re_color() {
-oldcolor=$(echo "$1" | grep -o "fill=\"#[^\"]*" | head -n 1 | sed -e "s/fill=\"//g")
+oldcolor=$(echo "$1" | sed "s/fill=\"/style=\"fill:/g" | grep -o "fill:#[^;\"]*" | head -n 1 | sed -e "s/fill://g")
 echo "$1" | sed -e "s/$oldcolor/$2/g" || show_error "Failed to re-color."
 }
 
