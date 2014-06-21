@@ -50,10 +50,10 @@ while [[ $# -gt 0 ]]; do
         -p|--png)
             png="true";;
         -s|--store)
-            opti="false";;
+            optimize="false";;
         -h|--help)
             args=( "-d, --dir <directory>" "-p, --png" "-s, --store" "-h, --help" )
-            desc=( "specify base directory" "generate PNG " "don't optimize icons" "show this help message and exit" )
+            desc=( "specify base directory" "generate PNG files" "don't optimize icons" "show this help message and exit" )
             printf "Usage:\tgen-icons [options...]\n\n"
             for ((i=0; i < ${#args[@]}; i++)); do
                 printf "\t%-30s%-s\n" "${args[i]}" "${desc[i]}"
@@ -75,7 +75,7 @@ done
 
 [[ "$basedir" && -d "$basedir" ]] || basedir="."
 [[ "$png" ]] || png="false"
-[[ "$opti" ]] || opti="true"
+[[ "$optimize" ]] || optimize="true"
 
 indir="$basedir/input"
 outdir="$basedir/output"
@@ -162,7 +162,7 @@ while read file; do
         overlay=""
     fi
 
-    rm -f "$outdir/svg/$icon" "$outdir/svg/${icon/svg/png}"
+    rm -f "$outdir/svg/$icon"
 
 cat <<EOF | tee "$outdir/svg/$icon" > /dev/null 2>&1
 <!-- (c) Numix Project -->
@@ -178,7 +178,7 @@ EOF
 if [[ -f "$outdir/svg/$icon" && `grep "</svg>" "$outdir/svg/$icon"` ]]; then
     sed -i "s/<g><\/g>//g" "$outdir/svg/$icon"
 
-    if [[ $opti = "true" ]]; then
+    if [[ $optimize = "true" ]]; then
         which svgcleaner-cli > /dev/null 2>&1
         if [[ $? -eq 0 ]]; then
             svgcleaner-cli "$outdir/svg/$icon" "$outdir/svg/$icon" --preset=basic --remove-prolog --remove-proc-instr --remove-unused-defs --remove-metadata-elts --remove-inkscape-elts --remove-sodipodi-elts --remove-ai-elts --remove-corel-elts --remove-msvisio-elts --remove-sketch-elts --remove-outside-elts --equal-elts-to-use --remove-version --remove-unreferenced-ids --trim-ids --remove-inkscape-atts --remove-sodipodi-atts --remove-ai-atts --remove-corel-atts --remove-msvisio-atts --remove-sketch-atts --remove-stroke-props --remove-fill-props > /dev/null 2>&1
@@ -196,6 +196,8 @@ else
     show_error "Failed to write $icon"
 fi
 if [[ $png = "true" ]]; then
+    rm -f "$outdir/png/${icon/svg/png}"
+
     which rsvg-convert > /dev/null 2>&1
     if [[ $? -eq 0 ]]; then
         rsvg-convert "$outdir/svg/$icon" -o "$outdir/png/${icon/svg/png}" > /dev/null 2>&1
@@ -204,7 +206,7 @@ if [[ $png = "true" ]]; then
     fi
 
     if [[ -f "$outdir/png/${icon/svg/png}" ]]; then
-        if [[ $opti = "true" ]]; then
+        if [[ $optimize = "true" ]]; then
             which optipng > /dev/null 2>&1
             if [[ $? -eq 0 ]]; then
                 optipng -strip all -o7 -zm1-9 "$outdir/png/${icon/svg/png}" > /dev/null 2>&1
