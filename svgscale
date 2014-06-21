@@ -1,7 +1,12 @@
 #!/bin/bash
 size="$1"
-if [[ -z "$size" ]]; then
+which rsvg-convert > /dev/null 2>&1
+if [[ ! $? -eq 0 ]]; then
+    echo "rsvg-convert not installed."
+    exit 1
+elif [[ -z "$size" ]]; then
     echo "Please specify a size."
+    exit 1
 else
     rm -rf "$size"
     mkdir -p "$size"
