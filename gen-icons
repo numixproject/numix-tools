@@ -48,7 +48,7 @@ while [[ $# -gt 0 ]]; do
             basedir="$2"
             shift;;
         -p|--png)
-            png="true";;
+            makepng="true";;
         -s|--store)
             optimize="false";;
         -h|--help)
@@ -73,9 +73,9 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-[[ "$basedir" && -d "$basedir" ]] || basedir="."
-[[ "$png" ]] || png="false"
-[[ "$optimize" ]] || optimize="true"
+[[ "$basedir" = "" ]] && basedir="."
+[[ "$makepng" = "" ]] && makepng="false"
+[[ "$optimize" = "" ]] && optimize="true"
 
 indir="$basedir/input"
 outdir="$basedir/output"
@@ -106,7 +106,7 @@ cat "$1" | tr "\n" " " | sed -e "s/<\/\?svg[^>]*>//g" -e "s/<[?]\?xml[^>]*>//g"
 
 re_color() {
 oldcolor=$(echo "$1" | grep -o "fill=\"#[^\"]*" | head -n 1 | sed -e "s/fill=\"//g")
-echo "$1" | sed -e "s/$oldcolor/$2/g" || show_error "Failed to re-color"
+echo "$1" | sed -e "s/$oldcolor/$2/g" || show_error "Failed to re-color."
 }
 
 get_viewbox() {
@@ -122,18 +122,18 @@ echo $viewbox
 }
 
 gen_icons() {
+if [[ ! -d "$templatedir" || ! -d "$symbolsdir" ]]; then
+    show_error "Directory structure is not set up."
+    exit 1
+fi
+
 [[ -d "$outdir/svg" ]] || mkdir -p "$outdir/svg"
-[[ -d "$outdir/png" ]] || [[ $png = "true" ]] && mkdir -p "$outdir/png"
+[[ -d "$outdir/png" ]] || [[ $makepng = "true" ]] && mkdir -p "$outdir/png"
 
 while read file; do
     icon=${file##*/}
     symbol=$(strip_tags "$file")
     color=$(echo "$symbol" | grep -o "<\!-- color: #.* -->" | grep -o "#\S*" || echo "#d64937")
-
-    if [[ ! -d "$templatedir" ]]; then
-        show_error "$templatedir doesn't exist."
-        return 1
-    fi
 
     if [[ -f "$templatedir/shadow.svg" ]]; then
         shadow=$(strip_tags "$templatedir/shadow.svg")
@@ -189,20 +189,20 @@ if [[ -f "$outdir/svg/$icon" && `grep "</svg>" "$outdir/svg/$icon"` ]]; then
 
     (( indexsvg++ ))
 
-    show_success "Successfully wrote $icon"
+    show_success "Successfully wrote $icon."
 else
     (( indexsvgerr++ ))
 
-    show_error "Failed to write $icon"
+    show_error "Failed to write $icon."
 fi
-if [[ $png = "true" ]]; then
+if [[ $makepng = "true" ]]; then
     rm -f "$outdir/png/${icon/svg/png}"
 
     which rsvg-convert > /dev/null 2>&1
     if [[ $? -eq 0 ]]; then
         rsvg-convert "$outdir/svg/$icon" -o "$outdir/png/${icon/svg/png}" > /dev/null 2>&1
     else
-        show_warning "rsvg-convert not installed"
+        show_warning "rsvg-convert not installed."
     fi
 
     if [[ -f "$outdir/png/${icon/svg/png}" ]]; then
@@ -211,24 +211,24 @@ if [[ $png = "true" ]]; then
             if [[ $? -eq 0 ]]; then
                 optipng -strip all -o7 -zm1-9 "$outdir/png/${icon/svg/png}" > /dev/null 2>&1
             else
-                show_warning "optipng not installed"
+                show_warning "optipng not installed."
             fi
         fi
 
         (( indexpng++ ))
 
-        show_success "Successfully wrote ${icon/svg/png}"
+        show_success "Successfully wrote ${icon/svg/png}."
     else
         (( indexpngerr++ ))
 
-        show_error "Failed to write ${icon/svg/png}"
+        show_error "Failed to write ${icon/svg/png}."
     fi
 fi
 
 done < <(find "$symbolsdir/" -name '*.svg' | sort -u)
 
 [[ $indexsvg -gt 0 || $indexpng -gt 0 ]] && echo "$indexsvg SVG and $indexpng PNG files written."
-[[ $indexsvgerr -gt 0 || $indexpngerr -gt 0 ]] && echo "$indexsvgerr SVG and $indexpngerr PNG files couldn't be written"
+[[ $indexsvgerr -gt 0 || $indexpngerr -gt 0 ]] && echo "$indexsvgerr SVG and $indexpngerr PNG files couldn't be written."
 }
 
 gen_icons
