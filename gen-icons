@@ -1,0 +1,232 @@
+#!/bin/bash
+# Script to generate icons from SVG templates
+#
+# Copyright (c) 2014  Numix Project
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+# DIRECTORY STRUCTURE
+#
+# The script understands the following directory structure.
+# It will take color information and file name from the symbols
+#
+# input/
+#     template/
+#         shadow.svg
+#         background.svg
+#         underlay.svg
+#         overlay.svg
+#     symbols/
+#         file-manager.svg
+#         text-editor.svg
+#         web-browser.svg
+# output/
+#     svg/
+#     png/
+#
+# COLOR INFORMATION
+#
+# The color information should be written in the following format
+# Only HEX color code is recognized
+#
+# <!-- color: #d64937 -->
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -d|--dir)
+            basedir="$2"
+            shift;;
+        -p|--png)
+            png="true";;
+        -s|--store)
+            opti="false";;
+        -h|--help)
+            args=( "-d, --dir <directory>" "-p, --png" "-s, --store" "-h, --help" )
+            desc=( "specify base directory" "generate PNG " "don't optimize icons" "show this help message and exit" )
+            printf "Usage:\tgen-icons [options...]\n\n"
+            for ((i=0; i < ${#args[@]}; i++)); do
+                printf "\t%-30s%-s\n" "${args[i]}" "${desc[i]}"
+            done
+            exit;;
+        -?|--*)
+            printf "Unrecognized option '$1'. Try '--help' for all available options.\n"
+            exit;;
+        -*)
+            args=$1
+            shift
+            set -- $(printf "$args" | cut -c 2- | sed 's/./-& /g') "$@"
+            continue;;
+        *)
+            break;;
+    esac
+    shift
+done
+
+[[ "$basedir" && -d "$basedir" ]] || basedir="."
+[[ "$png" ]] || png="false"
+[[ "$opti" ]] || opti="true"
+
+indir="$basedir/input"
+outdir="$basedir/output"
+templatedir="$indir/template"
+symbolsdir="$indir/symbols"
+indexsvg="0"
+indexpng="0"
+indexsvgerr="0"
+indexpngerr="0"
+
+show_success() {
+echo -e "\033[0;32m$@\033[0m"
+return 0
+}
+
+show_warning() {
+echo -e "\033[0;33m$@\033[0m"
+}
+
+show_error() {
+echo -e "\033[0;31m$@\033[0m" 1>&2
+return 1
+}
+
+strip_tags() {
+cat "$1" | tr "\n" " " | sed -e "s/<\/\?svg[^>]*>//g" -e "s/<[?]\?xml[^>]*>//g"
+}
+
+re_color() {
+oldcolor=$(echo "$1" | grep -o "fill=\"#[^\"]*" | head -n 1 | sed -e "s/fill=\"//g")
+echo "$1" | sed -e "s/$oldcolor/$2/g" || show_error "Failed to re-color"
+}
+
+get_viewbox() {
+viewbox=$(grep -o 'viewBox="[^"]*"' "$1")
+
+if [[ $viewbox = "" ]]; then
+    width=$(cat "$1" | tr "\n" " " | grep -o "<svg[^>]*>" | grep -o 'width="[^"]*"' | sed -e "s/width=//g" -e "s/\"//g")
+    height=$(cat "$1" | tr "\n" " " | grep -o "<svg[^>]*>" | grep -o 'height="[^"]*"' | sed -e "s/height=//g" -e "s/\"//g")
+    viewbox="viewBox=\"0 0 $width $height\""
+fi
+
+echo $viewbox
+}
+
+gen_icons() {
+[[ -d "$outdir/svg" ]] || mkdir -p "$outdir/svg"
+[[ -d "$outdir/png" ]] || [[ $png = "true" ]] && mkdir -p "$outdir/png"
+
+while read file; do
+    icon=${file##*/}
+    symbol=$(strip_tags "$file")
+    color=$(echo "$symbol" | grep -o "<\!-- color: #.* -->" | grep -o "#\S*" || echo "#d64937")
+
+    if [[ ! -d "$templatedir" ]]; then
+        show_error "$templatedir doesn't exist."
+        return 1
+    fi
+
+    if [[ -f "$templatedir/shadow.svg" ]]; then
+        shadow=$(strip_tags "$templatedir/shadow.svg")
+    else
+        shadow=""
+    fi
+
+    if [[ -f "$templatedir/background.svg" ]]; then
+        viewbox=$(get_viewbox "$templatedir/background.svg")
+        template=$(strip_tags "$templatedir/background.svg")
+        background=$(re_color "$template" "$color")
+    else
+        viewbox=""
+        background=""
+    fi
+
+    if [[ -f "$templatedir/underlay.svg" ]]; then
+        underlay=$(strip_tags "$templatedir/underlay.svg")
+    else
+        underlay=""
+    fi
+
+    if [[ -f "$templatedir/overlay.svg" ]]; then
+        overlay=$(strip_tags "$templatedir/overlay.svg")
+    else
+        overlay=""
+    fi
+
+    rm -f "$outdir/svg/$icon" "$outdir/svg/${icon/svg/png}"
+
+cat <<EOF | tee "$outdir/svg/$icon" > /dev/null 2>&1
+<!-- (c) Numix Project -->
+<svg ${viewbox}>
+<g>${shadow}</g>
+<g>${background}</g>
+<g>${underlay}</g>
+<g>${symbol}</g>
+<g>${overlay}</g>
+</svg>
+EOF
+
+if [[ -f "$outdir/svg/$icon" && `grep "</svg>" "$outdir/svg/$icon"` ]]; then
+    sed -i "s/<g><\/g>//g" "$outdir/svg/$icon"
+
+    if [[ $opti = "true" ]]; then
+        which svgcleaner-cli > /dev/null 2>&1
+        if [[ $? -eq 0 ]]; then
+            svgcleaner-cli "$outdir/svg/$icon" "$outdir/svg/$icon" --preset=basic --remove-prolog --remove-proc-instr --remove-unused-defs --remove-metadata-elts --remove-inkscape-elts --remove-sodipodi-elts --remove-ai-elts --remove-corel-elts --remove-msvisio-elts --remove-sketch-elts --remove-outside-elts --equal-elts-to-use --remove-version --remove-unreferenced-ids --trim-ids --remove-inkscape-atts --remove-sodipodi-atts --remove-ai-atts --remove-corel-atts --remove-msvisio-atts --remove-sketch-atts --remove-stroke-props --remove-fill-props > /dev/null 2>&1
+        else
+            show_warning "svgcleaner-cli not installed."
+        fi
+    fi
+
+    (( indexsvg++ ))
+
+    show_success "Successfully wrote $icon"
+else
+    (( indexsvgerr++ ))
+
+    show_error "Failed to write $icon"
+fi
+if [[ $png = "true" ]]; then
+    which rsvg-convert > /dev/null 2>&1
+    if [[ $? -eq 0 ]]; then
+        rsvg-convert "$outdir/svg/$icon" -o "$outdir/png/${icon/svg/png}" > /dev/null 2>&1
+    else
+        show_warning "rsvg-convert not installed"
+    fi
+
+    if [[ -f "$outdir/png/${icon/svg/png}" ]]; then
+        if [[ $opti = "true" ]]; then
+            which optipng > /dev/null 2>&1
+            if [[ $? -eq 0 ]]; then
+                optipng -strip all -o7 -zm1-9 "$outdir/png/${icon/svg/png}" > /dev/null 2>&1
+            else
+                show_warning "optipng not installed"
+            fi
+        fi
+
+        (( indexpng++ ))
+
+        show_success "Successfully wrote ${icon/svg/png}"
+    else
+        (( indexpngerr++ ))
+
+        show_error "Failed to write ${icon/svg/png}"
+    fi
+fi
+
+done < <(find "$symbolsdir/" -name '*.svg' | sort -u)
+
+[[ $indexsvg -gt 0 || $indexpng -gt 0 ]] && echo "$indexsvg SVG and $indexpng PNG files written."
+[[ $indexsvgerr -gt 0 || $indexpngerr -gt 0 ]] && echo "$indexsvgerr SVG and $indexpngerr PNG files couldn't be written"
+}
+
+gen_icons
