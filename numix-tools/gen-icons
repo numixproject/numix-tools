@@ -108,7 +108,7 @@ cat "$1" | tr "\n" " " | sed -e "s/<\/\?svg[^>]*>//g" -e "s/<[?]\?xml[^>]*>//g"
 
 re_color() {
 oldcolor=$(echo "$1" | sed -e "s/fill=\"/style=\"fill:/g" | grep -o "fill:#[^;\"]*" | head -n 1 | sed -e "s/fill://g")
-newcolor=${2:0:5}
+newcolor=${2:0:7}
 
 if [[ "$oldcolor" =~ ^# && "${#oldcolor}" =~ ^[4-9]$ ]]; then
     echo "$1" | sed -e "s/$oldcolor/$newcolor/g"
