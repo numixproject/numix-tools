@@ -164,9 +164,10 @@ while read file; do
     icon=${file##*/}
     symbol=$(strip_tags "$file")
     color=$(echo "$symbol" | grep -o "<\!-- color: #.* -->" | grep -o "#\S*" || echo "#d64937")
-    symbol="<g ${symbolprops}>${symbol}</g>"
 
     [[ "$background" = "" ]] || background=$(re_color "$background" "$color")
+
+    [[ "$symbolprops" = "" ]] || symbol="<g ${symbolprops}>${symbol}</g>"
 
     [[ "$clip" = "" ]] || symbol="<defs><clipPath id=\"clipPath\">${clip}</clipPath></defs><g clip-path=\"url(#clipPath)\">${symbol}</g>"
 
