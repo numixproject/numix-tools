@@ -105,8 +105,15 @@ cat "$1" | tr "\n" " " | sed -e "s/<\/\?svg[^>]*>//g" -e "s/<[?]\?xml[^>]*>//g"
 }
 
 re_color() {
-oldcolor=$(echo "$1" | sed "s/fill=\"/style=\"fill:/g" | grep -o "fill:#[^;\"]*" | head -n 1 | sed -e "s/fill://g")
-echo "$1" | sed -e "s/$oldcolor/$2/g" || show_error "Failed to re-color."
+oldcolor=$(echo "$1" | sed -e "s/fill=\"/style=\"fill:/g" | grep -o "fill:#[^;\"]*" | head -n 1 | sed -e "s/fill://g")
+
+if [[ "$oldcolor" =~ ^# && "${#oldcolor}" -eq 4 || "${#oldcolor}" -eq 7  ]]; then
+    echo "$1" | sed -e "s/$oldcolor/$2/g"
+else
+    oldtag=$(echo $1 | grep -o "<[^\!\?>]*" | head -n 1)
+    newtag=$(echo $oldtag | sed -e "s/$/ style=\"fill:$2\"/")
+    echo "$1" | sed -e "0,/$oldtag/s//$newtag/"
+fi
 }
 
 get_viewbox() {
