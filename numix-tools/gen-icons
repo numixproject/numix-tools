@@ -140,15 +140,6 @@ fi
 [[ -d "$outdir/svg" ]] || mkdir -p "$outdir/svg"
 [[ -d "$outdir/png" ]] || [[ $makepng = "true" ]] && mkdir -p "$outdir/png"
 
-if [[ -f "$templatedir/properties" ]]; then
-    props=$(cat "$templatedir/properties")
-
-    for (( i=0; i < ${#layers[@]}; i++ )); do
-        layerprops[$i]=${layers[i]}props
-        declare ${layerprops[i]}=$(echo $props | grep "${layers[i]}:" | sed -e "s/${layers[i]}: //g")
-    done
-fi
-
 for (( i=0; i < ${#layers[@]}; i++ )); do
     if [[ -f "$templatedir/${layers[i]}.svg" ]]; then
         declare ${layers[i]}="$(strip_tags $templatedir/${layers[i]}.svg)"
@@ -157,12 +148,23 @@ for (( i=0; i < ${#layers[@]}; i++ )); do
     fi
 done
 
+if [[ -f "$templatedir/properties" ]]; then
+    props=$(cat "$templatedir/properties")
+
+    for (( i=0; i < ${#layers[@]}; i++ )); do
+        layerprops[$i]=${layers[i]}props
+        declare ${layerprops[i]}=$(echo $props | grep "${layers[i]}:" | sed -e "s/${layers[i]}: //g")
+        [[ ${!layers[i]} = "" ]] || declare ${layers[i]}="<g ${!layerprops[i]}>${!layers[i]}</g>"
+    done
+fi
+
 [[ -f "$templatedir/background.svg" ]] && viewbox=$(get_viewbox "$templatedir/background.svg")
 
 while read file; do
     icon=${file##*/}
     symbol=$(strip_tags "$file")
     color=$(echo "$symbol" | grep -o "<\!-- color: #.* -->" | grep -o "#\S*" || echo "#d64937")
+    symbol="<g ${symbolprops}>${symbol}</g>"
 
     [[ "$background" = "" ]] || background=$(re_color "$background" "$color")
 
@@ -172,11 +174,11 @@ while read file; do
 
 cat <<EOF | tee "$outdir/svg/$icon" > /dev/null 2>&1
 <svg ${viewbox}>
-<g id="shadow" ${shadowprops}>${shadow}</g>
-<g id="background" ${backgroundprops}>${background}</g>
-<g id="underlay" ${underlayprops}>${underlay}</g>
-<g id="symbol" ${symbolprops}>${symbol}</g>
-<g id="overlay" ${overlayprops}>${overlay}</g>
+<g id="shadow">${shadow}</g>
+<g id="background">${background}</g>
+<g id="underlay">${underlay}</g>
+<g id="symbol">${symbol}</g>
+<g id="overlay">${overlay}</g>
 </svg>
 EOF
 
