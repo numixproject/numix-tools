@@ -138,52 +138,65 @@ fi
 [[ -d "$outdir/svg" ]] || mkdir -p "$outdir/svg"
 [[ -d "$outdir/png" ]] || [[ $makepng = "true" ]] && mkdir -p "$outdir/png"
 
+if [[ -f "$templatedir/shadow.svg" ]]; then
+    shadow=$(strip_tags "$templatedir/shadow.svg")
+else
+    shadow=""
+fi
+
+if [[ -f "$templatedir/background.svg" ]]; then
+    viewbox=$(get_viewbox "$templatedir/background.svg")
+    background=$(strip_tags "$templatedir/background.svg")
+else
+    viewbox=""
+    background=""
+fi
+
+if [[ -f "$templatedir/underlay.svg" ]]; then
+    underlay=$(strip_tags "$templatedir/underlay.svg")
+else
+    underlay=""
+fi
+
+if [[ -f "$templatedir/overlay.svg" ]]; then
+    overlay=$(strip_tags "$templatedir/overlay.svg")
+else
+    overlay=""
+fi
+
+if [[ -f "$templatedir/clip.svg" ]]; then
+    clippath=$(strip_tags "$templatedir/clip.svg")
+else
+    clippath=""
+fi
+
+if [[ -f "$templatedir/properties" ]]; then
+    props=$(cat "$templatedir/properties")
+    shadowprops=$(echo $props | grep "shadow:" | sed -e "s/shadow: //g")
+    backgroundprops=$(echo $props | grep "background:" | sed -e "s/background: //g")
+    underlayprops=$(echo $props | grep "underlay:" | sed -e "s/underlay: //g")
+    symbolprops=$(echo $props | grep "symbol:" | sed -e "s/symbol: //g")
+    overlayprops=$(echo $props | grep "overlay:" | sed -e "s/overlay: //g")
+fi
+
 while read file; do
     icon=${file##*/}
     symbol=$(strip_tags "$file")
     color=$(echo "$symbol" | grep -o "<\!-- color: #.* -->" | grep -o "#\S*" || echo "#d64937")
-
-    if [[ -f "$templatedir/shadow.svg" ]]; then
-        shadow=$(strip_tags "$templatedir/shadow.svg")
-    else
-        shadow=""
-    fi
-
-    if [[ -f "$templatedir/background.svg" ]]; then
-        viewbox=$(get_viewbox "$templatedir/background.svg")
-        template=$(strip_tags "$templatedir/background.svg")
-        background=$(re_color "$template" "$color")
-    else
-        viewbox=""
-        background=""
-    fi
-
-    if [[ -f "$templatedir/underlay.svg" ]]; then
-        underlay=$(strip_tags "$templatedir/underlay.svg")
-    else
-        underlay=""
-    fi
-
-    if [[ -f "$templatedir/overlay.svg" ]]; then
-        overlay=$(strip_tags "$templatedir/overlay.svg")
-    else
-        overlay=""
-    fi
-
-    if [[ -f "$templatedir/clip.svg" ]]; then
-        clippath=$(strip_tags "$templatedir/clip.svg")
-        symbol="<defs><clipPath id=\"clipPath\">${clippath}</clipPath></defs><g style=\"clip-path:url(#clipPath);\">${symbol}</g>"
-    fi
+    
+    [[ "$background" = "" ]] || background=$(re_color "$background" "$color")
+    
+    [[ "$clippath" = "" ]] || symbol="<defs><clipPath id=\"clipPath\">${clippath}</clipPath></defs><g clip-path=\"url(#clipPath)\">${symbol}</g>"
 
     rm -f "$outdir/svg/$icon"
 
 cat <<EOF | tee "$outdir/svg/$icon" > /dev/null 2>&1
 <svg ${viewbox}>
-<g>${shadow}</g>
-<g>${background}</g>
-<g>${underlay}</g>
-<g>${symbol}</g>
-<g>${overlay}</g>
+<g id="shadow" ${shadowprops}>${shadow}</g>
+<g id="background" ${backgroundprops}>${background}</g>
+<g id="underlay" ${underlayprops}>${underlay}</g>
+<g id="symbol" ${symbolprops}>${symbol}</g>
+<g id="overlay" ${overlayprops}>${overlay}</g>
 </svg>
 EOF
 
