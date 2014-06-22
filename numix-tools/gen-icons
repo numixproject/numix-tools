@@ -82,6 +82,7 @@ indir="$basedir/input"
 outdir="$basedir/output"
 templatedir="$indir/template"
 symbolsdir="$indir/symbols"
+layers=("shadow" "background" "underlay" "symbol" "overlay" "clip")
 indexsvg="0"
 indexpng="0"
 indexsvgerr="0"
@@ -107,12 +108,13 @@ cat "$1" | tr "\n" " " | sed -e "s/<\/\?svg[^>]*>//g" -e "s/<[?]\?xml[^>]*>//g"
 
 re_color() {
 oldcolor=$(echo "$1" | sed -e "s/fill=\"/style=\"fill:/g" | grep -o "fill:#[^;\"]*" | head -n 1 | sed -e "s/fill://g")
+newcolor=${2:0:5}
 
-if [[ "$oldcolor" =~ ^# && "${#oldcolor}" -eq 4 || "${#oldcolor}" -eq 7  ]]; then
-    echo "$1" | sed -e "s/$oldcolor/$2/g"
+if [[ "$oldcolor" =~ ^# && "${#oldcolor}" =~ ^[4-9]$ ]]; then
+    echo "$1" | sed -e "s/$oldcolor/$newcolor/g"
 else
     oldtag=$(echo $1 | grep -o "<[^\!\?>]*" | head -n 1)
-    newtag=$(echo $oldtag | sed -e "s/$/ style=\"fill:$2\"/")
+    newtag=$(echo $oldtag | sed -e "s/$/ style=\"fill:$newcolor\"/")
     echo "$1" | sed -e "0,/$oldtag/s//$newtag/"
 fi
 }
@@ -138,55 +140,33 @@ fi
 [[ -d "$outdir/svg" ]] || mkdir -p "$outdir/svg"
 [[ -d "$outdir/png" ]] || [[ $makepng = "true" ]] && mkdir -p "$outdir/png"
 
-if [[ -f "$templatedir/shadow.svg" ]]; then
-    shadow=$(strip_tags "$templatedir/shadow.svg")
-else
-    shadow=""
-fi
-
-if [[ -f "$templatedir/background.svg" ]]; then
-    viewbox=$(get_viewbox "$templatedir/background.svg")
-    background=$(strip_tags "$templatedir/background.svg")
-else
-    viewbox=""
-    background=""
-fi
-
-if [[ -f "$templatedir/underlay.svg" ]]; then
-    underlay=$(strip_tags "$templatedir/underlay.svg")
-else
-    underlay=""
-fi
-
-if [[ -f "$templatedir/overlay.svg" ]]; then
-    overlay=$(strip_tags "$templatedir/overlay.svg")
-else
-    overlay=""
-fi
-
-if [[ -f "$templatedir/clip.svg" ]]; then
-    clippath=$(strip_tags "$templatedir/clip.svg")
-else
-    clippath=""
-fi
-
 if [[ -f "$templatedir/properties" ]]; then
     props=$(cat "$templatedir/properties")
-    shadowprops=$(echo $props | grep "shadow:" | sed -e "s/shadow: //g")
-    backgroundprops=$(echo $props | grep "background:" | sed -e "s/background: //g")
-    underlayprops=$(echo $props | grep "underlay:" | sed -e "s/underlay: //g")
-    symbolprops=$(echo $props | grep "symbol:" | sed -e "s/symbol: //g")
-    overlayprops=$(echo $props | grep "overlay:" | sed -e "s/overlay: //g")
+
+    for (( i=0; i < ${#layers[@]}; i++ )); do
+        layerprops[$i]=${layers[i]}props
+        declare ${layerprops[i]}=$(echo $props | grep "${layers[i]}:" | sed -e "s/${layers[i]}: //g")
+    done
 fi
+
+for (( i=0; i < ${#layers[@]}; i++ )); do
+    if [[ -f "$templatedir/${layers[i]}.svg" ]]; then
+        declare ${layers[i]}="$(strip_tags $templatedir/${layers[i]}.svg)"
+    else
+        declare ${layers[i]}=""
+    fi
+done
+
+[[ -f "$templatedir/background.svg" ]] && viewbox=$(get_viewbox "$templatedir/background.svg")
 
 while read file; do
     icon=${file##*/}
     symbol=$(strip_tags "$file")
     color=$(echo "$symbol" | grep -o "<\!-- color: #.* -->" | grep -o "#\S*" || echo "#d64937")
-    
+
     [[ "$background" = "" ]] || background=$(re_color "$background" "$color")
-    
-    [[ "$clippath" = "" ]] || symbol="<defs><clipPath id=\"clipPath\">${clippath}</clipPath></defs><g clip-path=\"url(#clipPath)\">${symbol}</g>"
+
+    [[ "$clip" = "" ]] || symbol="<defs><clipPath id=\"clipPath\">${clip}</clipPath></defs><g clip-path=\"url(#clipPath)\">${symbol}</g>"
 
     rm -f "$outdir/svg/$icon"
 
