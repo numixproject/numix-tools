@@ -27,6 +27,7 @@
 #         background.svg
 #         underlay.svg
 #         overlay.svg
+#         clip.svg
 #     symbols/
 #         file-manager.svg
 #         text-editor.svg
@@ -63,7 +64,7 @@ while [[ $# -gt 0 ]]; do
             printf "Unrecognized option '$1'. Try '--help' for all available options.\n"
             exit;;
         -*)
-            args=$1
+            args="$1"
             shift
             set -- $(printf "$args" | cut -c 2- | sed 's/./-& /g') "$@"
             continue;;
@@ -119,13 +120,13 @@ fi
 get_viewbox() {
 viewbox=$(grep -o 'viewBox="[^"]*"' "$1")
 
-if [[ $viewbox = "" ]]; then
+if [[ "$viewbox" = "" ]]; then
     width=$(cat "$1" | tr "\n" " " | grep -o "<svg[^>]*>" | grep -o 'width="[^"]*"' | sed -e "s/width=//g" -e "s/\"//g")
     height=$(cat "$1" | tr "\n" " " | grep -o "<svg[^>]*>" | grep -o 'height="[^"]*"' | sed -e "s/height=//g" -e "s/\"//g")
     viewbox="viewBox=\"0 0 $width $height\""
 fi
 
-echo $viewbox
+echo "$viewbox"
 }
 
 gen_icons() {
@@ -169,10 +170,14 @@ while read file; do
         overlay=""
     fi
 
+    if [[ -f "$templatedir/clip.svg" ]]; then
+        clippath=$(strip_tags "$templatedir/clip.svg")
+        symbol="<defs><clipPath id=\"clipPath\">${clippath}</clipPath></defs><g style=\"clip-path:url(#clipPath);\">${symbol}</g>"
+    fi
+
     rm -f "$outdir/svg/$icon"
 
 cat <<EOF | tee "$outdir/svg/$icon" > /dev/null 2>&1
-<!-- (c) Numix Project -->
 <svg ${viewbox}>
 <g>${shadow}</g>
 <g>${background}</g>
