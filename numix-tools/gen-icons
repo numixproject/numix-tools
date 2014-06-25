@@ -140,7 +140,9 @@ layers=$(echo "$1" | sed -e "s/\+/ /g")
 svg="<svg ${viewbox}>"
 
 for layer in $layers; do
-    svg+="<g id=\"${layer}\">${!layer}</g>"
+    if [[ ! $layer = "" ]]; then
+        svg+="<g id=\"${layer}\">${!layer}</g>"
+    fi
 done
 
 svg+="</svg>"
