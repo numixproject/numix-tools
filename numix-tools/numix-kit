@@ -22,13 +22,14 @@
 # It will take color information and file name from the symbols
 #
 # input/
-#     template/
+#     templates/
 #         square/
 #             template.meta
 #             shadow.svg
 #             background.svg
 #             underlay.svg
 #             overlay.svg
+#             blur.svg
 #             clip.svg
 #     symbols/
 #         file-manager.svg
