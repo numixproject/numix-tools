@@ -23,12 +23,13 @@
 #
 # input/
 #     template/
-#         meta.template
-#         shadow.svg
-#         background.svg
-#         underlay.svg
-#         overlay.svg
-#         clip.svg
+#         square/
+#             template.meta
+#             shadow.svg
+#             background.svg
+#             underlay.svg
+#             overlay.svg
+#             clip.svg
 #     symbols/
 #         file-manager.svg
 #         text-editor.svg
@@ -50,13 +51,16 @@ while [[ $# -gt 0 ]]; do
         -d|--dir)
             basedir="$2"
             shift;;
+        -t|--template)
+            template="$2"
+            shift;;
         -p|--png)
             makepng="true";;
         -s|--store)
             optimize="false";;
         -h|--help)
-            args=( "-d, --dir <directory>" "-p, --png" "-s, --store" "-h, --help" )
-            desc=( "specify base directory" "generate PNG files" "don't optimize icons" "show this help message and exit" )
+            args=( "-d, --dir <directory>" "-t, --template" "-p, --png" "-s, --store" "-h, --help" )
+            desc=( "specify base directory" "specify template directory to use" "generate PNG files" "don't optimize icons" "show this help message and exit" )
             printf "Usage:\tgen-icons [options...]\n\n"
             for ((i=0; i < ${#args[@]}; i++)); do
                 printf "\t%-30s%-s\n" "${args[i]}" "${desc[i]}"
@@ -82,9 +86,21 @@ done
 
 indir="$basedir/input"
 outdir="$basedir/output"
-templatedir="$indir/template"
 symbolsdir="$indir/symbols"
-templatefile="$templatedir/meta.template"
+
+if [[ "$template" = "" ]]; then
+    while read dir; do
+        if [[ -f "$dir/template.meta" ]]; then
+            templatedir="$dir"
+            break
+        fi
+    done < <(find "$indir/templates" -maxdepth 1 -type d)
+fi
+
+[[ "$template" = "" ]] && template="default"
+[[ "$templatedir" = "" ]] && templatedir="$indir/templates/$template"
+
+templatefile="$templatedir/template.meta"
 
 trap exit INT
 
@@ -143,9 +159,7 @@ svg+="</svg>"
 rm -f "$outdir/svg/$icon"
 echo "$svg" > "$outdir/svg/$icon"
 
-if [[ -f "$outdir/svg/$icon" && `grep "</svg>" "$outdir/svg/$icon"` ]]; then
-    sed -i "s/<g><\/g>//g" "$outdir/svg/$icon"
-
+if [[ -f "$outdir/svg/$icon" && $(grep "<svg\|</svg>" "$outdir/svg/$icon") ]]; then
     if [[ $optimize = "true" ]]; then
         which svgcleaner-cli > /dev/null 2>&1
         if [[ $? -eq 0 ]]; then
@@ -165,10 +179,26 @@ strip_tags() {
 cat "$1" | tr "\n" " " | sed -e "s/<\/\?svg[^>]*>//g" -e "s/<[?]\?xml[^>]*>//g"
 }
 
+re_color() {
+data="$1"
+color="$2"
+
+if [[ $(echo "$data" | grep "fill[:=]") ]]; then
+    data=$(echo "$data" | sed -e "s/fill=\"/style=\"fill:/g" -e "s/fill:[^;\"]*/fill:${color}/g")
+else
+    oldtag=$(echo $data | grep -o "<.*" | grep -v "<[\!\?].+" | head -n 1 | sed -e 's/[[\.+^$/]/\\&/g')
+    newtag=$(echo $oldtag | sed -e "s/$/ style=\"fill:${color}\"/")
+    data=$(echo "$data" | sed -e "0,/$oldtag/s//$newtag/")
+fi
+
+echo "$data"
+}
+
 add_attr() {
 data="$1"
 attr="$2"
 type=$(echo $attr | cut -f1 -d"=")
+
 if [[ "$type" = "fill" ]]; then
     if [[ $attr =~ ^.+=\".+\[.+\]\"$ ]]; then
         prop=$(echo $attr | cut -f2 -d"\"")
@@ -179,20 +209,20 @@ if [[ "$type" = "fill" ]]; then
 
     color=${value:0:7}
 
-    if [[ $(echo "$data" | grep "fill[:=]") ]]; then
-        data=$(echo "$data" | sed -e "s/fill=\"/style=\"fill:/g" -e "s/fill:[^;\"]*/fill:${color}/g")
-    else
-        oldtag=$(echo $data | grep -o "<.*" | grep -v "<[\!\?].+" | head -n 1 | sed -e 's/[[\.+^$/]/\\&/g')
-        newtag=$(echo $oldtag | sed -e "s/$/ style=\"fill:${color}\"/")
-        data=$(echo "$data" | sed -e "0,/$oldtag/s//$newtag/")
-    fi
+    re_color "$data" "$color"
+elif [[ "$type" = "clip-path" || "$type" = "filter" ]]; then
+    case "$type" in
+        "clip-path")
+            tagname="clipPath";;
+        "filter")
+            tagname="filter";;
+    esac
 
-    echo "$data"
-elif [[ "$type" = "clip-path" ]]; then
-    url=$(echo $attr | cut -f2 -d"\"" | cut -f1 -d".")
-    echo "<defs><clipPath id=\"clipPath-${url}\">${!url}</clipPath></defs><g clip-path=\"url(#clipPath-${url})\">${data}</g>"
+    id=$(date +%N)
+    url=$(echo "$attr" | cut -f2 -d"\"" | cut -f1 -d".")
+    echo "<defs><${tagname} id=\"${tagname}-${id}\">${!url}</${tagname}></defs><g ${type}=\"url(#${tagname}-${id})\">${data}</g>"
 else
-    echo "<g $attr>$data</g>"
+    echo "<g ${attr}>${data}</g>"
 fi
 }
 
@@ -205,6 +235,11 @@ if [[ "$viewbox" = "" ]]; then
     height=$(cat "$file" | tr "\n" " " | grep -o "<svg[^>]*>" | grep -o 'height="[^"]*"' | sed -e "s/height=//g" -e "s/\"//g")
     viewbox="viewBox=\"0 0 $width $height\""
 fi
+
+if [[ "$viewbox" = "" || "$viewbox" = "0 0    " ]]; then
+    show_warning "Failed to determine viewBox."
+    return
+fi
 }
 
 read_props() {
@@ -212,27 +247,40 @@ data=$(echo "$1" | sed -e "s/\[/_/" -e "s/\]//")
 prop=$(echo "$data" | cut -f1 -d"_")
 name=$(echo "$data" | cut -f2 -d"_")
 value=$(echo "${!name}" | grep -o "<\!-- ${prop}: .* -->" | sed -e "s/<\!-- ${prop}: //g" -e "s/ -->//g")
-echo $value
+
+if [[ ! "$value" = "" ]]; then
+    echo $value
+else
+    show_warning "Property $prop not found."
+    return
+fi
 }
 
 read_files() {
 while read svg; do
     name=${svg##*/}
     var=${name%.svg}
-    export $var="$(strip_tags $svg)"
+    
+    if [[ $(grep "<svg\|</svg>" "$svg") ]]; then
+        export $var="$(strip_tags $svg)"
+    else
+        show_warning "$var doesn't seem to be a valid SVG file."
+        return
+    fi
+    
+    [[ $(grep "data:image" "$svg") ]] && show_warning "$svg contains raster image."
 done < <(find "$templatedir/" -name '*.svg' | sort -u)
 }
 
 read_index() {
 echo "$1" | while read line; do
     data=""
+    command=""
     for command in ${line[@]}; do
         if [[ "$command" =~ ^[a-z]+$ ]]; then
             data="$command"
         elif [[ "$command" =~ ^[a-z\-]+=\".*\"$ ]]; then
             declare $data="$(add_attr "${!data}" "$command")"
-        elif [[ "$command" =~ ^[a-z\-]+=\".*\"\!$ ]]; then
-            declare $data="$(add_attr "${!data}" "$command" "important")"
         elif [[ "$command" =~ ^\%[a-z]+$ ]]; then
             declare ${command#%}="${!data}"
             data=${command#%}
@@ -240,6 +288,8 @@ echo "$1" | while read line; do
             make_svg "$command"
 
             [[ "$makepng" = "true" ]] && make_png
+        else
+            show_warning "Unrecognized command $command."
         fi
     done
 done
@@ -257,7 +307,12 @@ fi
 if [[ -f "$templatefile" ]]; then
     template=$(cat "$templatefile" | sed -e "s/ //g" -e "s/->/ /g")
 else
-    show_error "No template file found."
+    show_error "No template file found in $templatefile."
+    exit 1
+fi
+
+if [[ "$template" = "" ]]; then
+    show_error "Template file is empty."
     exit 1
 fi
 
