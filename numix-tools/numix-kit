@@ -200,16 +200,17 @@ attr="$2"
 type=$(echo $attr | cut -f1 -d"=")
 
 if [[ "$type" = "fill" ]]; then
+    prop=$(echo $attr | cut -f2 -d"\"")
+
     if [[ $attr =~ ^.+=\".+\[.+\]\"$ ]]; then
-        prop=$(echo $attr | cut -f2 -d"\"")
         value=$(read_props "$prop")
     else
-        value=$(echo $attr | cut -f2 -d"\"")
+        value="$prop"
     fi
 
-    color=${value:0:7}
+    [[ "$value" = "" ]] && show_warn "Cannot find $prop value"
 
-    re_color "$data" "$color"
+    re_color "$data" "${value:0:7}"
 elif [[ "$type" = "clip-path" || "$type" = "filter" ]]; then
     case "$type" in
         "clip-path")
@@ -260,14 +261,14 @@ read_files() {
 while read svg; do
     name=${svg##*/}
     var=${name%.svg}
-    
+
     if [[ $(grep "<svg\|</svg>" "$svg") ]]; then
         export $var="$(strip_tags $svg)"
     else
         show_warning "$var doesn't seem to be a valid SVG file."
         return
     fi
-    
+
     [[ $(grep "data:image" "$svg") ]] && show_warning "$svg contains raster image."
 done < <(find "$templatedir/" -name '*.svg' | sort -u)
 }
