@@ -156,7 +156,7 @@ if [[ -f "$outdir/$template/svg/$icon" && $(grep "<svg\|</svg>" "$outdir/$templa
     if [[ "$optimize" = "true" ]]; then
         which svgcleaner-cli > /dev/null 2>&1
         if [[ $? -eq 0 ]]; then
-            svgcleaner-cli "$outdir/$template/svg/$icon" "$outdir/$template/svg/$icon" --preset=basic --remove-prolog --remove-proc-instr --remove-unused-defs --remove-metadata-elts --remove-inkscape-elts --remove-sodipodi-elts --remove-ai-elts --remove-corel-elts --remove-msvisio-elts --remove-sketch-elts --remove-outside-elts --equal-elts-to-use --remove-version --remove-unreferenced-ids --trim-ids --remove-inkscape-atts --remove-sodipodi-atts --remove-ai-atts --remove-corel-atts --remove-msvisio-atts --remove-sketch-atts --remove-stroke-props --remove-fill-props > /dev/null 2>&1
+            svgcleaner-cli "$outdir/$template/svg/$icon" "$outdir/$template/svg/$icon" --colors-to-rrggbb --convert-to-relative --compact-output --create-viewbox --equal-elts-to-use --merge-gradients --remove-ai-atts --remove-ai-elts --remove-corel-atts --remove-corel-elts --remove-duplicated-defs --remove-empty-containers --remove-fill-props --remove-inkscape-atts --remove-inkscape-elts --remove-invisible-elts --remove-metadata-elts --remove-msvisio-atts --remove-msvisio-elts --remove-nonsvg-elts --remove-notappl-atts --remove-outside-elts --remove-proc-instr --remove-prolog --remove-sketch-atts --remove-sketch-elts --remove-sodipodi-atts --remove-sodipodi-elts --remove-stroke-props --remove-unreferenced-ids --remove-unused-defs --remove-unused-xlinks --remove-version --rrggbb-to-rgb > /dev/null 2>&1
         else
             show_warn "svgcleaner-cli not installed."
         fi
@@ -293,7 +293,7 @@ done
 
 gen_icons() {
 if [[ ! -d "$templatedir" ]]; then
-    show_err "Template directory structure not found."
+    show_err "Template directory not found."
     exit 1
 fi
 
