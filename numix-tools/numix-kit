@@ -89,23 +89,14 @@ indir="$basedir/input"
 outdir="$basedir/output"
 symbolsdir="$indir/symbols"
 
-if [[ "$template" = "" ]]; then
-    while read dir; do
-        if [[ -f "$dir/template.meta" ]]; then
-            templatedir="$dir"
-            break
-        fi
-    done < <(find "$indir/templates" -maxdepth 1 -type d)
-fi
-
-[[ "$template" = "" ]] && template="default"
-[[ "$templatedir" = "" ]] && templatedir="$indir/templates/$template"
-
-templatefile="$templatedir/template.meta"
-
 trap exit INT
 
 show_info() {
+echo -e "\033[0;34m$@\033[0m"
+return 0
+}
+
+show_success() {
 echo -e "\033[0;32m$@\033[0m"
 return 0
 }
@@ -121,26 +112,26 @@ return 1
 }
 
 make_png() {
-rm -f "$outdir/png/${icon/svg/png}"
+rm -f "$outdir/$template/png/${icon/svg/png}"
 
 which rsvg-convert > /dev/null 2>&1
 if [[ $? -eq 0 ]]; then
-    rsvg-convert "$outdir/svg/$icon" -o "$outdir/png/${icon/svg/png}" > /dev/null 2>&1
+    rsvg-convert "$outdir/$template/svg/$icon" -o "$outdir/$template/png/${icon/svg/png}" > /dev/null 2>&1
 else
     show_warn "rsvg-convert not installed."
 fi
 
-if [[ -f "$outdir/png/${icon/svg/png}" ]]; then
+if [[ -f "$outdir/$template/png/${icon/svg/png}" ]]; then
     if [[ "$optimize" = "true" ]]; then
         which optipng > /dev/null 2>&1
         if [[ $? -eq 0 ]]; then
-            optipng -strip all -o7 -zm1-9 "$outdir/png/${icon/svg/png}" > /dev/null 2>&1
+            optipng -strip all -o7 -zm1-9 "$outdir/$template/png/${icon/svg/png}" > /dev/null 2>&1
         else
             show_warn "optipng not installed."
         fi
     fi
 
-    show_info "Successfully wrote ${icon/svg/png}."
+    show_success "Successfully wrote ${icon/svg/png}."
 else
     show_err "Failed to write ${icon/svg/png}."
 fi
@@ -158,20 +149,20 @@ done
 
 svg+="</svg>"
 
-rm -f "$outdir/svg/$icon"
-echo "$svg" > "$outdir/svg/$icon"
+rm -f "$outdir/$template/svg/$icon"
+echo "$svg" > "$outdir/$template/svg/$icon"
 
-if [[ -f "$outdir/svg/$icon" && $(grep "<svg\|</svg>" "$outdir/svg/$icon") ]]; then
+if [[ -f "$outdir/$template/svg/$icon" && $(grep "<svg\|</svg>" "$outdir/$template/svg/$icon") ]]; then
     if [[ "$optimize" = "true" ]]; then
         which svgcleaner-cli > /dev/null 2>&1
         if [[ $? -eq 0 ]]; then
-            svgcleaner-cli "$outdir/svg/$icon" "$outdir/svg/$icon" --preset=basic --remove-prolog --remove-proc-instr --remove-unused-defs --remove-metadata-elts --remove-inkscape-elts --remove-sodipodi-elts --remove-ai-elts --remove-corel-elts --remove-msvisio-elts --remove-sketch-elts --remove-outside-elts --equal-elts-to-use --remove-version --remove-unreferenced-ids --trim-ids --remove-inkscape-atts --remove-sodipodi-atts --remove-ai-atts --remove-corel-atts --remove-msvisio-atts --remove-sketch-atts --remove-stroke-props --remove-fill-props > /dev/null 2>&1
+            svgcleaner-cli "$outdir/$template/svg/$icon" "$outdir/$template/svg/$icon" --preset=basic --remove-prolog --remove-proc-instr --remove-unused-defs --remove-metadata-elts --remove-inkscape-elts --remove-sodipodi-elts --remove-ai-elts --remove-corel-elts --remove-msvisio-elts --remove-sketch-elts --remove-outside-elts --equal-elts-to-use --remove-version --remove-unreferenced-ids --trim-ids --remove-inkscape-atts --remove-sodipodi-atts --remove-ai-atts --remove-corel-atts --remove-msvisio-atts --remove-sketch-atts --remove-stroke-props --remove-fill-props > /dev/null 2>&1
         else
             show_warn "svgcleaner-cli not installed."
         fi
     fi
 
-    show_info "Successfully wrote $icon."
+    show_success "Successfully wrote $icon."
 else
     show_err "Failed to write $icon."
 fi
@@ -212,7 +203,7 @@ if [[ "$type" = "fill" ]]; then
 
     [[ "$value" = "" ]] && show_warn "Cannot find $prop value"
 
-    re_color "$data" "${value:0:7}"
+    data=$(re_color "$data" "${value:0:7}")
 elif [[ "$type" = "clip-path" || "$type" = "filter" ]]; then
     case "$type" in
         "clip-path")
@@ -225,13 +216,15 @@ elif [[ "$type" = "clip-path" || "$type" = "filter" ]]; then
     url=$(echo "$attr" | cut -f2 -d"\"" | cut -f1 -d".")
 
     if [[ ! "${!url}" = "" ]]; then
-        echo "<defs><${tagname} id=\"${tagname}-${id}\">${!url}</${tagname}></defs><g ${type}=\"url(#${tagname}-${id})\">${data}</g>"
+        data="<defs><${tagname} id=\"${tagname}-${id}\">${!url}</${tagname}></defs><g ${type}=\"url(#${tagname}-${id})\">${data}</g>"
     else
         show_warn "$type is empty or doesn't exist."
     fi
 else
-    echo "<g ${attr}>${data}</g>"
+    data="<g ${attr}>${data}</g>"
 fi
+
+echo "$data"
 }
 
 get_viewbox() {
@@ -275,7 +268,7 @@ while read svg; do
 done < <(find "$templatedir/" -name '*.svg' | sort -u)
 }
 
-read_index() {
+read_commands() {
 echo "$1" | while read line; do
     data=""
     command=""
@@ -299,25 +292,27 @@ done
 }
 
 gen_icons() {
-if [[ ! -d "$templatedir" || ! -d "$symbolsdir" ]]; then
-    show_err "Directory structure is not set up."
+if [[ ! -d "$templatedir" ]]; then
+    show_err "Template directory structure not found."
     exit 1
 fi
 
-[[ -d "$outdir/svg" ]] || mkdir -p "$outdir/svg"
-[[ -d "$outdir/png" ]] || [[ "$makepng" = "true" ]] && mkdir -p "$outdir/png"
+[[ -d "$outdir/$template/svg" ]] || mkdir -p "$outdir/$template/svg"
+[[ -d "$outdir/$template/png" ]] || [[ "$makepng" = "true" ]] && mkdir -p "$outdir/$template/png"
 
 if [[ -f "$templatefile" ]]; then
-    template=$(cat "$templatefile" | sed -e "s/ //g" -e "s/->/ /g")
+    templatedata=$(cat "$templatefile" | sed -e "s/ //g" -e "s/->/ /g")
 else
     show_err "No template file found in $templatefile."
     exit 1
 fi
 
-if [[ "$template" = "" ]]; then
+if [[ "$templatedata" = "" ]]; then
     show_err "Template file is empty."
     exit 1
 fi
+
+show_info "Found template in $templatedir"
 
 read_files
 get_viewbox
@@ -325,8 +320,30 @@ get_viewbox
 while read file; do
     icon=${file##*/}
     symbol=$(strip_tags "$file")
-    read_index "$template"
+    read_commands "$templatedata"
 done < <(find "$symbolsdir/" -name '*.svg' | sort -u)
 }
 
-gen_icons
+get_template() {
+if [[ ! -d "$indir" || ! -d "$symbolsdir" ]]; then
+    show_err "Directory structure is not set up."
+    exit 1
+fi
+
+if [[ "$template" = "" ]]; then
+    while read dir; do
+        if [[ -f "$dir/template.meta" ]]; then
+            template="${dir##*/}"
+            templatedir="$dir"
+            templatefile="$dir/template.meta"
+            gen_icons
+        fi
+    done < <(find "$indir/templates" -maxdepth 1 -type d)
+else
+    templatedir="$indir/templates/$template"
+    templatefile="$templatedir/template.meta"
+    gen_icons
+fi
+}
+
+get_template
