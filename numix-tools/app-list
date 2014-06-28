@@ -1,0 +1,93 @@
+#!/usr/bin/python3
+
+# This script just creates a CSV file for the completion of the numix app families
+# It is unlicensed and comes with no warranty - do with it whatever you want.
+
+# Dependencies 
+from os import chdir, getcwd, listdir, makedirs, path 
+from subprocess import call
+# also needs git, curl
+
+if not path.exists("numix-check"):
+	makedirs("numix-check")
+	chdir("numix-check")
+else:
+	print("'numix-check' directory exists")
+	exit()
+
+# Gets needed documents
+call(["git", "clone", "https://github.com/numixproject/numix-app-icons.git"]) # main app icon repo
+call(["curl", "-s", "-o", "hc.txt", "https://raw.githubusercontent.com/Foggalong/hardcode-fixer/master/data/list/tofix.txt"]) # hardcoded list
+
+# Creating lists
+full, vibrant, pastel, mono = [], [], [], []
+
+# Filling Vibrant
+for icon in listdir(getcwd()+"/numix-app-icons/Symbols/Vibrant/Desktop/") + listdir(getcwd()+"/numix-app-icons/Symbols/Vibrant/Android/"):
+	if icon.replace(".svg","") in full:
+		vibrant.append(icon.replace(".svg",""))
+	else:
+		full.append(icon.replace(".svg","")); vibrant.append(icon.replace(".svg",""))
+
+# Filling Pastel
+for icon in listdir(getcwd()+"/numix-app-icons/Symbols/Pastel/Desktop/") + listdir(getcwd()+"/numix-app-icons/Symbols/Pastel/Android/"):
+	if icon.replace(".svg","") in full:
+		pastel.append(icon.replace(".svg",""))
+	else:
+		full.append(icon.replace(".svg","")); pastel.append(icon.replace(".svg",""))
+
+# Filling Mono
+for icon in listdir(getcwd()+"/numix-app-icons/Symbols/Mono/Desktop/") + listdir(getcwd()+"/numix-app-icons/Symbols/Mono/Android/"):
+	if icon.replace(".svg","") in full:
+		mono.append(icon.replace(".svg",""))
+	else:
+		full.append(icon.replace(".svg","")); mono.append(icon.replace(".svg",""))
+
+# Correcting order
+full.sort(key=str.lower); vibrant.sort(key=str.lower); pastel.sort(key=str.lower); mono.sort(key=str.lower)
+
+# Ceating and filling hardcoded data
+hc_list = []
+target = open("hc.txt", 'r')
+for line in target:
+	if "|" in line and line.split("|")[4] in full:
+		hc_list.append(line.split("|")[4])
+target.close()
+
+# Generates CSV data
+master = []       # 2d data array becomes CSV file
+for icon in full: # each icon makes a CSV row
+	temp = [icon] # temp list makes up CSV columns
+	# Vibrant column
+	if icon in vibrant:
+		temp.append("✔")
+	else:
+		temp.append("")
+	# Pastel column
+	if icon in pastel:
+		temp.append("✔")
+	else:
+		temp.append("")
+	# Mono column
+	if icon in mono:
+		temp.append("✔")
+	else:
+		temp.append("")
+	# Hardcoded column
+	if icon in hc_list:
+		temp.append("✔")
+	else:
+		temp.append("")
+	# Adds list to array
+	master.append(temp)
+
+# To file
+target = open("../app-list.csv", 'w') # creats in a directory it knows exists
+target.truncate()
+target.write("Application,Vibrant,Pastel,Mono,Hardcoded\n")
+for line in master:
+	target.write(",".join(line)+"\n")
+target.close()
+
+# Clean up
+chdir("../"); call(["rm", "-rf", "numix-check"])
