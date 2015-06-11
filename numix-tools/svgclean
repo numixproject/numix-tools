@@ -7,7 +7,7 @@ if [[ $? -eq 0 ]]; then
 		if [[ `grep -i "inkscape\|sodipodi\|rgb" "$file"` || "$1" = "-f" ]]
 		then
 			echo "Optimizing $file"
-			svgcleaner-cli "$file" "$file" --colors-to-rrggbb --convert-to-relative --compact-output --create-viewbox --merge-gradients --remove-ai-atts --remove-ai-elts --remove-corel-atts --remove-corel-elts --remove-duplicated-defs --remove-empty-containers --remove-fill-props --remove-inkscape-atts --remove-inkscape-elts --remove-invisible-elts --remove-metadata-elts --remove-msvisio-atts --remove-msvisio-elts --remove-nonsvg-elts --remove-notappl-atts --remove-outside-elts --remove-proc-instr --remove-prolog --remove-sketch-atts --remove-sketch-elts --remove-sodipodi-atts --remove-sodipodi-elts --remove-stroke-props --remove-unreferenced-ids --remove-unused-defs --remove-unused-xlinks --remove-version --rrggbb-to-rgb
+			svgcleaner-cli "$file" "$file" --colors-to-rrggbb --convert-to-relative --create-viewbox --join-style-atts --merge-gradients --remove-ai-atts --remove-ai-elts --remove-corel-atts --remove-corel-elts --remove-duplicated-defs --remove-empty-containers --remove-fill-props --remove-inkscape-atts --remove-inkscape-elts --remove-invisible-elts --remove-metadata-elts --remove-msvisio-atts --remove-msvisio-elts --remove-nonsvg-elts --remove-notappl-atts --remove-outside-elts --remove-proc-instr --remove-prolog --remove-sketch-atts --remove-sketch-elts --remove-sodipodi-atts --remove-sodipodi-elts --remove-stroke-props --remove-unreferenced-ids --remove-unused-defs --remove-unused-xlinks --remove-version --rrggbb-to-rgb
 		fi
 	done
 else
