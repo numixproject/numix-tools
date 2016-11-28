@@ -11,22 +11,5 @@ if [[ $? -eq 0 ]]; then
 		fi
 	done
 else
-	echo "'svgcleaner-cli' is not installed - Would you like to install it?"
-
-	read reply
-
-	if [[ "$reply" = [yY] || "$reply" = [yY][eE][sS] ]]
-	then
-		sudo add-apt-repository ppa:svg-cleaner-team/svgcleaner -y
-
-		sudo apt-get update
-		sudo apt-get install svgcleaner
-
-		echo "All done!"
-
-		exit 0
-	else
-		echo "Exiting..."
-	exit 1
-	fi
+	echo "'svgcleaner-cli' is not installed."
 fi
