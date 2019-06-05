@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Numix icon themes packaging script, v0.1
-# MIT Licensed, Copyright 2019, Numix Project
+# GPLv3+ Licensed, Copyright 2019, Numix Project
 
 themes=("circle" "square")
 
