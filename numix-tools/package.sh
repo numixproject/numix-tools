@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 
-# Numix icon themes packaging script, v0.1
-# GPLv3+ Licensed, Copyright 2019, Numix Project
+# Numix icon themes packaging script, v0.2
+# GPLv3+ Licensed, Copyright 2020, Numix Project
 
 themes=("circle" "square")
+
 
 # ensure it has the core repo downloaded and up to date
 if [ ! -d "core/" ]; then
@@ -12,6 +13,7 @@ if [ ! -d "core/" ]; then
 else
     cd core/ && git pull
 fi
+
 
 for theme in "${themes[@]}"; do
     # build the latest theme from git
@@ -36,6 +38,12 @@ for theme in "${themes[@]}"; do
         git add $dir
         git commit -m "Icons from $(date +%y.%m.%d)"
         git push origin master
+    fi
+
+    # tag the new releases if "--tag" flag used
+    if [ "$1" == "--tag" ]; then
+        git tag "$(date +%y.%m.%d)"
+        git push --tags
     fi
 
     # return to core directory
